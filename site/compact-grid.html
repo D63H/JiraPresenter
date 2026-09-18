@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Jira Wallboard — High-Density Grid</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body class="min-h-screen bg-slate-950 text-slate-100 flex flex-col antialiased">
+
+  <!-- Header -->
+  <header class="border-b border-slate-800/80 bg-slate-900/90 backdrop-blur sticky top-0 z-30 px-6 py-3">
+    <div class="max-w-[1920px] mx-auto flex flex-wrap items-center justify-between gap-4">
+      
+      <!-- Left: Identity -->
+      <div class="flex items-center space-x-3.5">
+        <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-amber-600 via-orange-600 to-red-600 flex items-center justify-center shadow-lg shadow-orange-500/20">
+          <i data-lucide="layout-grid" class="w-5 h-5 text-white"></i>
+        </div>
+        <div>
+          <div class="flex items-center space-x-2.5">
+            <h1 id="board-title" class="font-extrabold text-lg lg:text-xl text-white tracking-tight">Project Board</h1>
+            <span class="px-2 py-0.5 text-[11px] font-bold rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">Dense Overview</span>
+          </div>
+          <p class="text-[11px] text-slate-400 flex items-center gap-2">
+            <span>Project: <span id="project-key" class="font-mono text-slate-200 font-semibold">-</span></span>
+            <span>•</span>
+            <span>Board: <span id="board-id" class="font-mono text-slate-200 font-semibold">-</span></span>
+          </p>
+        </div>
+      </div>
+
+      <!-- Center: Layout View Switcher -->
+      <nav class="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 shadow-inner">
+        <a href="index.html" class="flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/50 transition">
+          <i data-lucide="target" class="w-3.5 h-3.5"></i>
+          <span>Active Focus</span>
+        </a>
+        <a href="auto-scroll.html" class="flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/50 transition">
+          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
+          <span>Auto-Cycle</span>
+        </a>
+        <a href="compact-grid.html" class="flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold rounded-lg bg-amber-600 text-white shadow">
+          <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
+          <span>Dense Grid</span>
+        </a>
+      </nav>
+
+      <!-- Right: Refresh Timer, Digital Clock -->
+      <div class="flex items-center space-x-4">
+        <!-- Silent Auto-Refresh countdown -->
+        <div class="flex items-center gap-2 bg-slate-800/60 border border-slate-700/50 px-3.5 py-1.5 rounded-xl text-xs">
+          <i id="refresh-indicator" data-lucide="refresh-cw" class="w-3.5 h-3.5 text-blue-400"></i>
+          <span class="text-slate-400">Sync in:</span>
+          <span id="refresh-countdown" class="font-mono font-bold text-slate-200">3h 0m</span>
+        </div>
+
+        <!-- Clock -->
+        <div class="text-right pl-2 border-l border-slate-800">
+          <div id="digital-clock" class="font-mono text-base lg:text-lg font-extrabold text-white tracking-wider leading-none">--:--:--</div>
+          <div id="digital-date" class="text-[10px] font-medium text-slate-400">--</div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Compact KPI Strip -->
+  <section class="max-w-[1920px] w-full mx-auto px-6 py-2.5">
+    <div class="flex flex-wrap items-center justify-between gap-4 bg-slate-900/60 border border-slate-800/80 rounded-xl px-5 py-2 text-xs">
+      <div class="flex items-center gap-6">
+        <div class="flex items-center gap-2">
+          <span class="text-slate-400 font-medium uppercase text-[11px]">Total:</span>
+          <span id="metric-total" class="font-bold text-white text-sm">0</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+          <span class="text-amber-400 font-medium uppercase text-[11px]">To Do:</span>
+          <span id="metric-todo" class="font-bold text-amber-300 text-sm">0</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-blue-400"></span>
+          <span class="text-blue-400 font-medium uppercase text-[11px]">In Progress:</span>
+          <span id="metric-inprogress" class="font-bold text-blue-300 text-sm">0</span>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span>
+          <span class="text-emerald-400 font-medium uppercase text-[11px]">Done:</span>
+          <span id="metric-done" class="font-bold text-emerald-300 text-sm">0</span>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-3">
+        <span class="text-slate-400 text-[11px] font-medium">Completion Rate:</span>
+        <div class="w-32 bg-slate-800 rounded-full h-2 overflow-hidden flex">
+          <div id="progress-done" class="bg-emerald-500 h-2" style="width: 0%"></div>
+          <div id="progress-inprogress" class="bg-blue-500 h-2" style="width: 0%"></div>
+        </div>
+        <span id="metric-percent" class="font-mono font-bold text-emerald-400 text-xs">0%</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- High Density Grid Columns -->
+  <main class="max-w-[1920px] w-full mx-auto px-6 py-2 flex-1 grid grid-cols-1 md:grid-cols-3 gap-5">
+    <!-- To Do -->
+    <div class="bg-slate-900/40 border border-slate-800/80 rounded-xl p-3 flex flex-col">
+      <div class="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-800">
+        <span class="font-bold text-xs uppercase tracking-wider text-amber-400 flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-amber-400"></span> To Do
+        </span>
+        <span id="col-count-todo" class="px-2 py-0.5 text-[11px] font-bold rounded bg-slate-800 text-amber-300">0</span>
+      </div>
+      <div id="col-issues-todo" class="space-y-2 flex-1 overflow-y-auto pr-1"></div>
+    </div>
+
+    <!-- In Progress -->
+    <div class="bg-slate-900/40 border border-slate-800/80 rounded-xl p-3 flex flex-col">
+      <div class="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-800">
+        <span class="font-bold text-xs uppercase tracking-wider text-blue-400 flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-blue-400"></span> In Progress
+        </span>
+        <span id="col-count-inprogress" class="px-2 py-0.5 text-[11px] font-bold rounded bg-slate-800 text-blue-300">0</span>
+      </div>
+      <div id="col-issues-inprogress" class="space-y-2 flex-1 overflow-y-auto pr-1"></div>
+    </div>
+
+    <!-- Done -->
+    <div class="bg-slate-900/40 border border-slate-800/80 rounded-xl p-3 flex flex-col">
+      <div class="flex items-center justify-between pb-2 mb-2.5 border-b border-slate-800">
+        <span class="font-bold text-xs uppercase tracking-wider text-emerald-400 flex items-center gap-1.5">
+          <span class="w-2 h-2 rounded-full bg-emerald-400"></span> Done
+        </span>
+        <span id="col-count-done" class="px-2 py-0.5 text-[11px] font-bold rounded bg-slate-800 text-emerald-300">0</span>
+      </div>
+      <div id="col-issues-done" class="space-y-2 flex-1 overflow-y-auto pr-1"></div>
+    </div>
+  </main>
+
+  <script src="config.js"></script>
+  <script src="tv-common.js"></script>
+  <script>
+    async function loadData() {
+      try {
+        const res = await fetch('data/jira_data.json?v=' + Date.now());
+        if (!res.ok) throw new Error('Data fetch failed');
+        const data = await res.json();
+        renderDenseGrid(data);
+      } catch (e) {
+        console.error('Failed to load Jira data:', e);
+      }
+    }
+
+    function renderDenseGrid(data) {
+      const meta = data.metadata || {};
+      const issues = data.issues || [];
+
+      document.getElementById('board-title').textContent = meta.title || 'Project Board';
+      if (meta.project_key) document.getElementById('project-key').textContent = meta.project_key;
+      if (meta.board_id) document.getElementById('board-id').textContent = meta.board_id;
+
+      const todoList = issues.filter(i => i.status_category === 'new');
+      const inprogressList = issues.filter(i => i.status_category === 'indeterminate');
+      const doneList = issues.filter(i => i.status_category === 'done');
+
+      document.getElementById('metric-total').textContent = issues.length;
+      document.getElementById('metric-todo').textContent = todoList.length;
+      document.getElementById('metric-inprogress').textContent = inprogressList.length;
+      document.getElementById('metric-done').textContent = doneList.length;
+
+      const total = issues.length;
+      const pct = total > 0 ? Math.round((doneList.length / total) * 100) : 0;
+      document.getElementById('metric-percent').textContent = `${pct}%`;
+      document.getElementById('progress-done').style.width = `${total > 0 ? (doneList.length / total) * 100 : 0}%`;
+      document.getElementById('progress-inprogress').style.width = `${total > 0 ? (inprogressList.length / total) * 100 : 0}%`;
+
+      document.getElementById('col-count-todo').textContent = todoList.length;
+      document.getElementById('col-count-inprogress').textContent = inprogressList.length;
+      document.getElementById('col-count-done').textContent = doneList.length;
+
+      renderDenseCards(document.getElementById('col-issues-todo'), todoList, 'tv-card-todo');
+      renderDenseCards(document.getElementById('col-issues-inprogress'), inprogressList, 'tv-card-inprogress');
+      renderDenseCards(document.getElementById('col-issues-done'), doneList, 'tv-card-done');
+
+      if (window.lucide) lucide.createIcons();
+    }
+
+    function renderDenseCards(container, issues, borderClass) {
+      if (issues.length === 0) {
+        container.innerHTML = '<div class="text-center py-6 text-slate-500 text-xs italic">No issues</div>';
+        return;
+      }
+
+      container.innerHTML = issues.map(issue => {
+        const priorityClass = getPriorityBadgeClass(issue.priority);
+        const typeIcon = getTypeIcon(issue.issue_type);
+        const avatarHTML = issue.assignee_avatar
+          ? `<img src="${issue.assignee_avatar}" class="w-4 h-4 rounded-full ring-1 ring-slate-700" />`
+          : `<div class="w-4 h-4 rounded-full bg-slate-700 flex items-center justify-center text-[9px] font-bold text-slate-300">${issue.assignee ? issue.assignee.charAt(0) : '?'}</div>`;
+
+        return `
+          <div class="tv-card ${borderClass} border border-slate-800/80 rounded-lg p-2.5 shadow-sm text-xs">
+            <div class="flex items-center justify-between mb-1">
+              <div class="flex items-center gap-1.5">
+                <i data-lucide="${typeIcon}" class="w-3.5 h-3.5 text-slate-400"></i>
+                <span class="font-mono font-bold text-blue-400 text-xs">${issue.key}</span>
+              </div>
+              <span class="text-[10px] font-semibold px-1.5 py-0.2 rounded border ${priorityClass}">
+                ${issue.priority}
+              </span>
+            </div>
+
+            <p class="font-medium text-slate-200 line-clamp-1 leading-snug mb-1.5">
+              ${issue.summary}
+            </p>
+
+            <div class="flex items-center justify-between text-[11px] text-slate-400 pt-1 border-t border-slate-800/60">
+              <div class="flex items-center gap-1.5">
+                ${avatarHTML}
+                <span class="truncate max-w-[110px]">${issue.assignee || 'Unassigned'}</span>
+              </div>
+              <span class="font-mono text-[10px] text-slate-500">${formatRelativeTime(issue.updated)}</span>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    document.addEventListener('DOMContentLoaded', () => {
+      initRefreshSettings(loadData);
+      loadData();
+    });
+  </script>
+</body>
+</html>
