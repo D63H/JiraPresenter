@@ -1,6 +1,6 @@
 # Agent Memory
 
-*Last Updated: 2026-09-17 22:18*
+*Last Updated: 2026-09-24 10:00*
 
 ## Project Overview
 - **Name**: Jira Public Presenter
@@ -33,6 +33,7 @@
   - Live digital clock (HH:MM:SS) and date.
   - In-browser silent background polling from `data/jira_data.json` with visual countdown.
   - Configurable in-browser refresh interval (defaults to 180 min / 3 hours, configurable via UI selector or `?refresh=180` URL param).
+- The three wallboard layouts share a light palette in `style.css`, with dark utility colors remapped for readable bright-room display.
 
 ## Agent Guidelines & Rules
 - Always include a confidence percentage (`0% - 100%`) in responses.

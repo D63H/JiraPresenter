@@ -1,15 +1,134 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;600;700&display=swap');
 
 :root {
+  color-scheme: light;
   --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
 
 body {
   font-family: var(--font-sans);
-  background-color: #090d16;
-  color: #f8fafc;
+  background-color: #f1f5f9;
+  color: #0f172a;
   overflow-x: hidden;
+  scrollbar-color: #94a3b8 #e2e8f0;
+  scrollbar-width: thin;
+}
+
+/* Recolor the existing Tailwind dark-palette utilities for a bright-room display. */
+[class~="bg-slate-950"] {
+  background-color: #f1f5f9 !important;
+}
+
+[class~="bg-slate-900"],
+[class~="bg-slate-900/40"],
+[class~="bg-slate-900/50"],
+[class~="bg-slate-900/60"],
+[class~="bg-slate-900/70"],
+[class~="bg-slate-900/90"] {
+  background-color: #fff !important;
+}
+
+[class~="bg-slate-800"],
+[class~="bg-slate-800/60"],
+[class~="bg-slate-800/80"],
+[class~="bg-slate-700/40"] {
+  background-color: #f1f5f9 !important;
+}
+
+[class~="bg-slate-700"] {
+  background-color: #e2e8f0 !important;
+}
+
+[class~="bg-amber-600"] {
+  background-color: #b45309 !important;
+}
+
+[class~="bg-emerald-600"] {
+  background-color: #047857 !important;
+}
+
+[class~="border-slate-600/40"],
+[class~="border-slate-700"],
+[class~="border-slate-700/50"],
+[class~="border-slate-700/60"],
+[class~="border-slate-700/70"],
+[class~="border-slate-800"],
+[class~="border-slate-800/60"],
+[class~="border-slate-800/80"],
+[class~="border-slate-800/90"] {
+  border-color: #cbd5e1 !important;
+}
+
+[class~="ring-slate-600"],
+[class~="ring-slate-700"] {
+  --tw-ring-color: #cbd5e1 !important;
+}
+
+[class~="hover:bg-slate-700/50"]:hover,
+[class~="hover:bg-slate-800/40"]:hover {
+  background-color: #e2e8f0 !important;
+}
+
+[class~="border-slate-800"]:hover {
+  border-color: rgba(37, 99, 235, 0.45) !important;
+}
+
+[class~="hover:border-slate-700"]:hover {
+  border-color: #94a3b8 !important;
+}
+
+[class~="text-slate-100"] {
+  color: #0f172a !important;
+}
+
+[class~="text-slate-200"] {
+  color: #1e293b !important;
+}
+
+[class~="text-slate-300"] {
+  color: #334155 !important;
+}
+
+[class~="text-slate-400"] {
+  color: #475569 !important;
+}
+
+[class~="text-amber-300"],
+[class~="text-amber-400"] {
+  color: #92400e !important;
+}
+
+[class~="text-blue-300"],
+[class~="text-blue-400"],
+[class~="hover:text-blue-400"]:hover {
+  color: #1d4ed8 !important;
+}
+
+[class~="text-emerald-300"],
+[class~="text-emerald-400"] {
+  color: #047857 !important;
+}
+
+[class~="text-orange-300"] {
+  color: #c2410c !important;
+}
+
+[class~="text-rose-300"] {
+  color: #be123c !important;
+}
+
+[class~="hover:text-slate-200"]:hover,
+[class~="hover:text-white"]:hover {
+  color: #0f172a !important;
+}
+
+#board-title,
+#digital-clock,
+#metric-total,
+#current-page-num,
+#total-page-num {
+  color: #0f172a !important;
 }
 
 /* Custom scrollbars */
@@ -18,25 +137,25 @@ body {
   height: 6px;
 }
 ::-webkit-scrollbar-track {
-  background: #0f172a;
+  background: #e2e8f0;
 }
 ::-webkit-scrollbar-thumb {
-  background: #334155;
+  background: #94a3b8;
   border-radius: 4px;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #475569;
+  background: #64748b;
 }
 
 /* Big Monitor Wallboard Card */
 .tv-card {
   transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
-  background: linear-gradient(180deg, rgba(30, 41, 59, 0.7) 0%, rgba(15, 23, 42, 0.8) 100%);
+  background: linear-gradient(180deg, #fff 0%, #f8fafc 100%);
 }
 .tv-card:hover {
-  border-color: rgba(96, 165, 250, 0.4);
+  border-color: rgba(37, 99, 235, 0.45);
   transform: translateY(-2px);
-  box-shadow: 0 12px 24px -6px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 12px 24px -6px rgba(15, 23, 42, 0.14);
 }
 
 /* Card in Progress subtle glow */

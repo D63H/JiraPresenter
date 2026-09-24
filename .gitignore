@@ -15,3 +15,5 @@ ENV/
 # Local test artifacts / OS
 .DS_Store
 Thumbs.db
+
+jira_data.json
