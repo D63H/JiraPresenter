@@ -26,13 +26,14 @@
 ## Frontend & Wallboard Modes (`site/`)
 - Designed specifically for 1080p and 4K Wallboards and Big Monitors.
 - Three distinct view options:
-  1. `index.html` (**Active Focus**): Displays only the current active sprint (or top active issues) fitting on screen without scrolling.
+  1. `index.html` (**Team Focus**): Large-text carousel or team overview, grouped by Jira assignee and active parent hierarchy.
   2. `auto-scroll.html` (**Auto-Cycle**): Cycles batches of cards every 12 seconds with progress ticker and pause/play toggle.
   3. `compact-grid.html` (**Dense Grid**): High-density cards fitting dozens of issues simultaneously.
 - **Shared Wallboard Engine (`tv-common.js`)**:
   - Live digital clock (HH:MM:SS) and date.
   - In-browser silent background polling from `data/jira_data.json` with visual countdown.
   - Configurable in-browser refresh interval (defaults to 180 min / 3 hours, configurable via UI selector or `?refresh=180` URL param).
+- Team Focus derives its roster from assignees in the sanitized export and rolls active issues up through in-progress parents. Its shareable layouts use `view=carousel|overview` and `layout=side-by-side|stacked`; the stacked grid rule must be outside responsive media queries to work on desktop. Missing active tickets can be caused by `JIRA_JQL`/board scope; a corrected query restored PD-838 and PD-1445 without a code change. Keep parent fields allowlisted; use synthetic fixtures for UI tests and do not inspect `.env` or generated Jira data during code changes.
 - The three wallboard layouts share a light palette in `style.css`, with dark utility colors remapped for readable bright-room display.
 
 ## Agent Guidelines & Rules
