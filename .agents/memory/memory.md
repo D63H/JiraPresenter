@@ -1,6 +1,6 @@
 # Agent Memory
 
-*Last Updated: 2026-11-02 10:25*
+*Last Updated: 2026-11-02 10:58*
 
 ## Project Overview
 - **Name**: Jira Public Presenter
@@ -26,7 +26,7 @@
 ## Frontend & Wallboard Modes (`site/`)
 - Designed specifically for 1080p and 4K Wallboards and Big Monitors.
 - `index.html` is the primary Team Focus page, with a large-text carousel and team overview, grouped by Jira assignee and active parent hierarchy. The carousel rotates assignees; URL parameters choose the view and ticket layout.
-- The Team Focus header is intentionally a compact light status bar; retain project identity, refresh countdown, and clock without restoring a tall brand/navigation header.
+- The Team Focus header is a compact light status bar with project identity and clock, without a brand badge or visible refresh countdown. Keep the main heading free of decorative eyebrow text and retain background JSON polling so an open wallboard picks up new deployments.
 - Carousel navigation uses matching icon-only buttons with accessible labels and tooltips; avoid asymmetric arrow/text layouts.
 - `compact-grid.html` is an optional All Tickets status grid linked from the Team Focus footer.
 - **Shared Wallboard Engine (`tv-common.js`)**:
