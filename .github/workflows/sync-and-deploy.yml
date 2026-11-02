@@ -2,9 +2,9 @@ name: Sync Jira & Deploy to GitHub Pages
 
 on:
   schedule:
-    # Runs every 3 hours (e.g., 00:00, 03:00, 06:00, 09:00, 12:00, 15:00, 18:00, 21:00 UTC)
-    # To run only Mon-Fri business hours (8am-6pm Eastern / ~12:00-22:00 UTC), adjust the cron string below.
-    - cron: '0 */3 * * *'
+    # Runs at 10:05 AM Eastern Monday-Friday, adjusting for daylight saving time.
+    - cron: '5 10 * * 1-5'
+      timezone: "America/New_York"
   workflow_dispatch: # Allows manual one-click trigger from GitHub Actions tab
   push:
     branches:
@@ -17,17 +17,34 @@ permissions:
   pages: write
   id-token: write
 
-# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# Keep one Pages run active; non-scheduled runs can cancel an older run.
 concurrency:
   group: 'pages'
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.event_name != 'schedule' }}
 
 jobs:
   build:
+    outputs:
+      jira_data_changed: ${{ steps.compare-jira-data.outputs.changed }}
+      jira_data_hash: ${{ steps.compare-jira-data.outputs.hash }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v7
+
+      - name: Restore last deployed Jira data fingerprint
+        id: restore-jira-fingerprint
+        uses: actions/cache/restore@v6
+        with:
+          path: .cache/jira-data-fingerprint.txt
+          key: jira-data-fingerprint-${{ github.run_id }}-${{ github.run_attempt }}
+          restore-keys: |
+            jira-data-fingerprint-
+        continue-on-error: true
+
+      - name: Warn if the Jira data fingerprint could not be restored
+        if: steps.restore-jira-fingerprint.outcome == 'failure'
+        run: echo "::warning::Could not restore the previous Jira fingerprint; this run will publish fetched data."
 
       - name: Set up Python
         uses: actions/setup-python@v7
@@ -52,21 +69,77 @@ jobs:
         run: |
           python scripts/fetch_jira.py --output site/data/jira_data.json
 
+      - name: Compare fetched Jira data with last deployment
+        id: compare-jira-data
+        run: |
+          python - <<'PY'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          data = json.loads(Path("site/data/jira_data.json").read_text(encoding="utf-8"))
+          metadata = data.get("metadata")
+          if isinstance(metadata, dict):
+              metadata.pop("last_updated_utc", None)
+
+          digest = hashlib.sha256(
+              json.dumps(data, sort_keys=True, separators=(",", ":"), ensure_ascii=False).encode("utf-8")
+          ).hexdigest()
+
+          fingerprint_path = Path(".cache/jira-data-fingerprint.txt")
+          previous_digest = fingerprint_path.read_text(encoding="utf-8").strip() if fingerprint_path.is_file() else ""
+          changed = digest != previous_digest
+
+          if changed:
+              fingerprint_path.parent.mkdir(parents=True, exist_ok=True)
+              fingerprint_path.write_text(digest + "\n", encoding="utf-8")
+
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"changed={str(changed).lower()}\n")
+              output.write(f"hash={digest}\n")
+          print(f"Jira data changed: {str(changed).lower()}")
+          PY
+
       - name: Setup GitHub Pages
+        if: github.event_name != 'schedule' || steps.compare-jira-data.outputs.changed == 'true'
         uses: actions/configure-pages@v6
 
       - name: Upload Pages Artifact
+        if: github.event_name != 'schedule' || steps.compare-jira-data.outputs.changed == 'true'
         uses: actions/upload-pages-artifact@v5
         with:
           path: './site'
 
   deploy:
+    needs: build
+    if: github.event_name != 'schedule' || needs.build.outputs.jira_data_changed == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     runs-on: ubuntu-latest
-    needs: build
     steps:
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v5
+
+      - name: Prepare deployed Jira data fingerprint
+        if: needs.build.outputs.jira_data_changed == 'true'
+        env:
+          JIRA_DATA_HASH: ${{ needs.build.outputs.jira_data_hash }}
+        run: |
+          mkdir -p .cache
+          printf '%s\n' "$JIRA_DATA_HASH" > .cache/jira-data-fingerprint.txt
+
+      - name: Cache deployed Jira data fingerprint
+        id: save-jira-fingerprint
+        if: needs.build.outputs.jira_data_changed == 'true'
+        uses: actions/cache/save@v6
+        with:
+          path: .cache/jira-data-fingerprint.txt
+          key: jira-data-fingerprint-${{ github.run_id }}-${{ github.run_attempt }}
+        continue-on-error: true
+
+      - name: Warn if the deployed Jira data fingerprint could not be cached
+        if: steps.save-jira-fingerprint.outcome == 'failure'
+        run: echo "::warning::Deployment succeeded but its Jira fingerprint was not cached; the next scheduled run may deploy again."
