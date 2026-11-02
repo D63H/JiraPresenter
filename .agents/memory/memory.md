@@ -1,6 +1,6 @@
 # Agent Memory
 
-*Last Updated: 2026-09-24 10:42*
+*Last Updated: 2026-11-02 10:25*
 
 ## Project Overview
 - **Name**: Jira Public Presenter
@@ -11,7 +11,7 @@
 ## Architecture & Security
 - **Credentials**: Stored exclusively in **GitHub Secrets** (`JIRA_BASE_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN`). Never committed to Git.
 - **Git Security**: `.env` is strictly ignored in `.gitignore`. Committed `site/data/jira_data.json` contains generic demo issues (`DEMO-101`, etc.) to prevent exposing private company ticket titles when pushed to public GitHub repositories.
-- **CI/CD**: `.github/workflows/sync-and-deploy.yml` runs every 3 hours (`0 */3 * * *`) and supports manual `workflow_dispatch`. Runs `scripts/fetch_jira.py` and deploys `site/` to GitHub Pages; actions use Node 24-compatible majors.
+- **CI/CD**: `.github/workflows/sync-and-deploy.yml` runs weekdays at 10:05 AM America/New_York (timezone-aware across daylight saving time) and supports manual `workflow_dispatch`. Runs `scripts/fetch_jira.py` and deploys `site/` to GitHub Pages; actions use Node 24-compatible majors. It hashes the sanitized payload without `last_updated_utc` and caches the fingerprint only after successful deployment. Scheduled runs skip Pages deployment on a match; push/manual runs still deploy, and cache misses publish.
 
 ## Jira Cloud REST API Discoveries
 - **Auth**: Uses HTTP Basic Auth (`email:token`). Also supports Bearer tokens if personal access tokens are supplied without email.
@@ -31,7 +31,7 @@
 - `compact-grid.html` is an optional All Tickets status grid linked from the Team Focus footer.
 - **Shared Wallboard Engine (`tv-common.js`)**:
   - Live digital clock (HH:MM:SS) and date.
-  - In-browser silent background polling from `data/jira_data.json` with visual countdown.
+  - In-browser polling re-fetches the deployed static `data/jira_data.json` with a visual countdown; it does not query Jira. New Jira data requires the workflow to fetch and redeploy the site.
   - Configurable in-browser refresh interval (defaults to 180 min / 3 hours, configurable via UI selector or `?refresh=180` URL param).
 - Team Focus derives its roster from assignees in the sanitized export and rolls active issues up through in-progress parents. Its shareable layouts use `view=carousel|overview` and `layout=side-by-side|stacked`; the stacked grid rule must be outside responsive media queries to work on desktop. Missing active tickets can be caused by `JIRA_JQL`/board scope; a corrected query restored PD-838 and PD-1445 without a code change. Keep parent fields allowlisted; use synthetic fixtures for UI tests and do not inspect `.env` or generated Jira data during code changes.
 - The wallboard layouts share a light palette in `style.css`, with dark utility colors remapped for readable bright-room display.
