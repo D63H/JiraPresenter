@@ -425,26 +425,29 @@ body.team-focus {
 }
 
 .team-person-navigation {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-width: 0;
+  display: grid;
+  place-items: center;
+  align-self: center;
+  justify-self: center;
+  width: 56px;
+  height: 56px;
+  padding: 0;
   border: 1px solid var(--team-line);
-  border-radius: 18px;
-  background: rgba(255, 255, 255, 0.8);
+  border-radius: 16px;
+  background: #fff;
   color: #334155;
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.07);
 }
 
-.team-person-navigation span:first-child,
-.team-person-navigation span:last-child {
-  font-size: 28px;
+.team-navigation-arrow {
+  font-size: 24px;
+  font-weight: 700;
   line-height: 1;
 }
 
-.team-person-navigation .team-control-label {
-  font-size: 12px;
+.team-person-navigation:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.12);
 }
 
 .team-person-navigation:hover:not(:disabled),
@@ -909,16 +912,14 @@ body.team-focus {
   }
 
   .team-carousel-stage {
-    grid-template-columns: 42px minmax(0, 1fr) 42px;
+    grid-template-columns: 48px minmax(0, 1fr) 48px;
     gap: 8px;
   }
 
   .team-person-navigation {
+    width: 42px;
+    height: 42px;
     border-radius: 12px;
-  }
-
-  .team-person-navigation .team-control-label {
-    display: none;
   }
 
   .team-person-panel {
