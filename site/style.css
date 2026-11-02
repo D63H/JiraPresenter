@@ -302,7 +302,6 @@ body.team-focus {
 
 .team-brand,
 .team-header-status,
-.team-sync-status,
 .team-clock {
   display: flex;
   align-items: center;
@@ -310,18 +309,6 @@ body.team-focus {
 
 .team-brand {
   min-width: 0;
-  gap: 12px;
-}
-
-.team-brand-label {
-  flex: 0 0 auto;
-  padding: 6px 9px;
-  border-radius: 8px;
-  background: #dbeafe;
-  color: #1e40af;
-  font-size: 10px;
-  font-weight: 800;
-  letter-spacing: 0.09em;
 }
 
 .team-brand-copy {
@@ -350,25 +337,10 @@ body.team-focus {
   gap: 18px;
 }
 
-.team-sync-status {
-  gap: 8px;
-  color: var(--team-muted);
-  font-size: 13px;
-  white-space: nowrap;
-}
-
-.team-sync-status strong {
-  color: var(--team-ink);
-  font-family: var(--font-mono);
-  font-size: 14px;
-}
-
 .team-clock {
   flex-direction: column;
   align-items: flex-end;
   gap: 3px;
-  padding-left: 18px;
-  border-left: 1px solid #dbe3ee;
 }
 
 .team-clock time {
@@ -397,14 +369,6 @@ body.team-focus {
   justify-content: space-between;
   gap: 28px;
   margin-bottom: 28px;
-}
-
-.team-eyebrow {
-  margin: 0 0 8px;
-  color: var(--team-blue);
-  font-size: 13px;
-  font-weight: 800;
-  letter-spacing: 0.13em;
 }
 
 .team-main-heading h2 {
@@ -954,7 +918,7 @@ body.team-focus {
   }
 
   .team-header-status {
-    justify-content: space-between;
+    justify-content: flex-end;
   }
 
   .team-main-heading {
