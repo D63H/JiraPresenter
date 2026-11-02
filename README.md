@@ -18,6 +18,7 @@ A generic, automated, and **100% free** open-source solution to pull issues from
 - 🗂️ **Team-Focused Wallboard**: A large-text carousel with side-by-side or stacked tickets, plus a team overview grouped by assignee and active parent/child relationships.
 - 🔗 **Shareable Layouts**: Set `?view=carousel|overview&layout=side-by-side|stacked` in the URL; switching views updates these parameters while preserving other settings.
 - 🧭 **Focused at a Glance**: Only in-progress tickets are featured; child details can be expanded when useful.
+- 📋 **Optional All Tickets View**: A compact status grid remains available from the Team Focus footer for detailed reference.
 - 🛡️ **Sanitized Public Data**: Strips internal comments, user emails, and attachments, exposing only allowlisted issue and parent fields such as keys, summaries, statuses, types, priority, and assignee display names.
 
 ---
@@ -158,6 +159,7 @@ Open `http://localhost:8000` in your browser.
 │   └── fetch_jira.py              # Generic Jira Cloud REST API extractor & sanitizer
 ├── site/
 │   ├── index.html                 # Large-text team focus (Carousel + Team Overview)
+│   ├── compact-grid.html          # Optional all-tickets status grid
 │   ├── people-focus.js            # Assignee grouping, parent roll-up, and view controls
 │   ├── style.css                  # Custom styling and animations
 │   ├── app.js                     # Legacy issue filtering and modal logic

@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Jira Wallboard — High-Density Grid</title>
+  <title>Jira Wallboard — All Tickets</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>📊</text></svg>">
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
@@ -23,7 +23,7 @@
         <div>
           <div class="flex items-center space-x-2.5">
             <h1 id="board-title" class="font-extrabold text-lg lg:text-xl text-white tracking-tight">Project Board</h1>
-            <span class="px-2 py-0.5 text-[11px] font-bold rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">Dense Overview</span>
+            <span class="px-2 py-0.5 text-[11px] font-bold rounded bg-amber-500/15 text-amber-400 border border-amber-500/30">All Tickets</span>
           </div>
           <p class="text-[11px] text-slate-400 flex items-center gap-2">
             <span>Project: <span id="project-key" class="font-mono text-slate-200 font-semibold">-</span></span>
@@ -33,20 +33,15 @@
         </div>
       </div>
 
-      <!-- Center: Layout View Switcher -->
-      <nav class="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 shadow-inner">
+      <nav class="flex items-center bg-slate-800/80 p-1 rounded-xl border border-slate-700/60 shadow-inner" aria-label="Wallboard views">
         <a href="index.html" class="flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/50 transition">
           <i data-lucide="target" class="w-3.5 h-3.5"></i>
           <span>Team Focus</span>
         </a>
-        <a href="auto-scroll.html" class="flex items-center gap-2 px-3.5 py-1.5 text-xs font-medium rounded-lg text-slate-300 hover:text-white hover:bg-slate-700/50 transition">
-          <i data-lucide="refresh-cw" class="w-3.5 h-3.5"></i>
-          <span>Auto-Cycle</span>
-        </a>
-        <a href="compact-grid.html" class="flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold rounded-lg bg-amber-600 text-white shadow">
+        <span class="flex items-center gap-2 px-3.5 py-1.5 text-xs font-bold rounded-lg bg-amber-600 text-white shadow" aria-current="page">
           <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i>
-          <span>Dense Grid</span>
-        </a>
+          <span>All Tickets</span>
+        </span>
       </nav>
 
       <!-- Right: Refresh Timer, Digital Clock -->
