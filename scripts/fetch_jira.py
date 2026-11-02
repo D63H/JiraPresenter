@@ -52,6 +52,13 @@ def get_mock_data(site_title="Sprint & Kanban Roadmap", base_url="https://exampl
                 "priority": "High",
                 "assignee": "Alex Mercer",
                 "assignee_avatar": "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=64&h=64&fit=crop&crop=faces",
+                "parent_key": f"{project_key}-100",
+                "parent_summary": "Refresh account self-service",
+                "parent_status": "In Progress",
+                "parent_status_category": "indeterminate",
+                "parent_issue_type": "Epic",
+                "parent_assignee": None,
+                "parent_jira_url": f"{base_url}/browse/{project_key}-100",
                 "created": "2026-09-10T14:30:00.000Z",
                 "updated": "2026-09-17T18:22:00.000Z",
                 "labels": ["frontend", "ui/ux"],
@@ -118,8 +125,8 @@ def get_mock_data(site_title="Sprint & Kanban Roadmap", base_url="https://exampl
                 "status_category_name": "To Do",
                 "issue_type": "Spike",
                 "priority": "Low",
-                "assignee": None,
-                "assignee_avatar": None,
+                "assignee": "Priya Singh",
+                "assignee_avatar": "https://images.unsplash.com/photo-1531123897727-8f129e1688ce?w=64&h=64&fit=crop&crop=faces",
                 "created": "2026-09-16T15:30:00.000Z",
                 "updated": "2026-09-16T15:30:00.000Z",
                 "labels": ["research", "realtime"],
@@ -201,6 +208,25 @@ def get_mock_data(site_title="Sprint & Kanban Roadmap", base_url="https://exampl
 def parse_issue(issue, base_url):
     """Sanitizes raw Jira issue object into safe public dictionary."""
     fields = issue.get("fields", {})
+
+    parent_obj = fields.get("parent")
+    if not isinstance(parent_obj, dict):
+        parent_obj = {}
+    parent_fields = parent_obj.get("fields")
+    if not isinstance(parent_fields, dict):
+        parent_fields = {}
+    parent_status_obj = parent_fields.get("status")
+    if not isinstance(parent_status_obj, dict):
+        parent_status_obj = {}
+    parent_status_category_obj = parent_status_obj.get("statusCategory")
+    if not isinstance(parent_status_category_obj, dict):
+        parent_status_category_obj = {}
+    parent_type_obj = parent_fields.get("issuetype")
+    if not isinstance(parent_type_obj, dict):
+        parent_type_obj = {}
+    parent_assignee_obj = parent_fields.get("assignee")
+    if not isinstance(parent_assignee_obj, dict):
+        parent_assignee_obj = {}
     
     # Status & category
     status_obj = fields.get("status") or {}
@@ -246,6 +272,8 @@ def parse_issue(issue, base_url):
 
     key = issue.get("key", "")
     jira_url = f"{base_url}/browse/{key}" if key else ""
+    parent_key = parent_obj.get("key", "")
+    parent_jira_url = f"{base_url}/browse/{parent_key}" if parent_key else ""
 
     return {
         "id": str(issue.get("id", "")),
@@ -262,7 +290,14 @@ def parse_issue(issue, base_url):
         "updated": fields.get("updated"),
         "labels": fields.get("labels", []),
         "sprint": sprint_name,
-        "jira_url": jira_url
+        "jira_url": jira_url,
+        "parent_key": parent_key or None,
+        "parent_summary": parent_fields.get("summary"),
+        "parent_status": parent_status_obj.get("name"),
+        "parent_status_category": parent_status_category_obj.get("key"),
+        "parent_issue_type": parent_type_obj.get("name"),
+        "parent_assignee": parent_assignee_obj.get("displayName"),
+        "parent_jira_url": parent_jira_url or None
     }
 
 
@@ -310,7 +345,7 @@ def fetch_from_jira(base_url, email, token, board_id=None, project_key=None, cus
 
     # 2. Fetch Issues (Agile API or JQL Search)
     raw_issues = []
-    fields_to_request = "summary,status,issuetype,priority,assignee,created,updated,labels,sprint,customfield_10020"
+    fields_to_request = "summary,status,issuetype,priority,assignee,created,updated,labels,sprint,customfield_10020,parent"
 
     # Determine query strategy
     use_agile_api = bool(board_id and not custom_jql)

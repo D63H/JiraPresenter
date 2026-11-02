@@ -6,6 +6,6 @@ window.WALLBOARD_CONFIG = {
   // Default is 180 (3 hours).
   refreshIntervalMinutes: 180,
 
-  // Duration in seconds between page cycles in the Auto-Cycle view (auto-scroll.html).
+  // Duration in seconds between Team Focus carousel slides.
   cycleDurationSeconds: 12
 };
