@@ -1,6 +1,6 @@
 # Agent Memory
 
-*Last Updated: 2026-09-24 10:00*
+*Last Updated: 2026-09-24 10:42*
 
 ## Project Overview
 - **Name**: Jira Public Presenter
@@ -11,7 +11,7 @@
 ## Architecture & Security
 - **Credentials**: Stored exclusively in **GitHub Secrets** (`JIRA_BASE_URL`, `JIRA_USER_EMAIL`, `JIRA_API_TOKEN`). Never committed to Git.
 - **Git Security**: `.env` is strictly ignored in `.gitignore`. Committed `site/data/jira_data.json` contains generic demo issues (`DEMO-101`, etc.) to prevent exposing private company ticket titles when pushed to public GitHub repositories.
-- **CI/CD**: `.github/workflows/sync-and-deploy.yml` runs every 3 hours (`0 */3 * * *`) and supports manual `workflow_dispatch`. Runs `scripts/fetch_jira.py` and deploys `site/` to GitHub Pages.
+- **CI/CD**: `.github/workflows/sync-and-deploy.yml` runs every 3 hours (`0 */3 * * *`) and supports manual `workflow_dispatch`. Runs `scripts/fetch_jira.py` and deploys `site/` to GitHub Pages; actions use Node 24-compatible majors.
 
 ## Jira Cloud REST API Discoveries
 - **Auth**: Uses HTTP Basic Auth (`email:token`). Also supports Bearer tokens if personal access tokens are supplied without email.
