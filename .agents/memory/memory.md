@@ -1,6 +1,6 @@
 # Agent Memory
 
-*Last Updated: 2026-11-02 10:58*
+*Last Updated: 2026-11-04 16:13*
 
 ## Project Overview
 - **Name**: Jira Public Presenter
@@ -33,7 +33,7 @@
   - Live digital clock (HH:MM:SS) and date.
   - In-browser polling re-fetches the deployed static `data/jira_data.json` with a visual countdown; it does not query Jira. New Jira data requires the workflow to fetch and redeploy the site.
   - Configurable in-browser refresh interval (defaults to 180 min / 3 hours, configurable via UI selector or `?refresh=180` URL param).
-- Team Focus derives its roster from assignees in the sanitized export and rolls active issues up through in-progress parents. Its shareable layouts use `view=carousel|overview` and `layout=side-by-side|stacked`; the stacked grid rule must be outside responsive media queries to work on desktop. Missing active tickets can be caused by `JIRA_JQL`/board scope; a corrected query restored PD-838 and PD-1445 without a code change. Keep parent fields allowlisted; use synthetic fixtures for UI tests and do not inspect `.env` or generated Jira data during code changes.
+- Team Focus derives its roster from assignees in the sanitized issue export. Each in-progress issue is grouped by its actual assignee and rolled up to the highest Jira parent, regardless of ancestor status or assignee. Parent cards use a text-only “Working toward” cue and a bottom progress bar for completed descendants / all descendants; omit count lines, status pills, and child rows. The fetcher follows parent links missing from the configured query and adds a sanitized `parent_chain` only to in-progress issues. It fetches descendant statuses in batches and publishes only completion/total counts, without changing issue totals or creating roster entries; omit the progress bar if descendant data cannot be loaded or there are no descendants. Its shareable layouts use `view=carousel|overview` and `layout=side-by-side|stacked`; keep the stacked grid rule outside responsive media queries. Missing active tickets can still reflect `JIRA_JQL`/board scope; a corrected query restored PD-838 and PD-1445 without a code change. Keep parent fields allowlisted; use synthetic fixtures and do not inspect `.env` or generated Jira data during code changes.
 - The wallboard layouts share a light palette in `style.css`, with dark utility colors remapped for readable bright-room display.
 
 ## Agent Guidelines & Rules

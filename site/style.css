@@ -529,13 +529,6 @@ body.team-focus {
   line-height: 1.1;
 }
 
-.team-person-work-count {
-  margin: 7px 0 0;
-  color: var(--team-muted);
-  font-size: 18px;
-  font-weight: 600;
-}
-
 .team-work-list {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr));
@@ -560,6 +553,20 @@ body.team-focus {
   background: #f8fafc;
 }
 
+.team-parent-context-card {
+  border-left-color: #7c3aed;
+  background: #faf8ff;
+}
+
+.team-context-label {
+  margin: 0 0 12px;
+  color: #6d28d9;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
 .team-ticket-heading,
 .team-ticket-identity {
   display: flex;
@@ -572,22 +579,17 @@ body.team-focus {
   flex-wrap: wrap;
 }
 
-.team-ticket-type,
-.team-status-pill,
-.team-context-pill {
+.team-ticket-type {
   display: inline-flex;
   align-items: center;
   min-height: 28px;
   padding: 4px 10px;
   border-radius: 999px;
+  background: #e2e8f0;
+  color: #334155;
   font-size: 12px;
   font-weight: 800;
   white-space: nowrap;
-}
-
-.team-ticket-type {
-  background: #e2e8f0;
-  color: #334155;
 }
 
 .team-ticket-key {
@@ -602,17 +604,6 @@ body.team-focus {
   text-decoration: underline;
 }
 
-.team-status-pill {
-  background: #dbeafe;
-  color: #1e40af;
-}
-
-.team-context-pill {
-  margin-top: 12px;
-  background: #fef3c7;
-  color: #92400e;
-}
-
 .team-ticket-summary {
   overflow-wrap: anywhere;
   margin: 18px 0 0;
@@ -622,51 +613,20 @@ body.team-focus {
   line-height: 1.25;
 }
 
-.team-children {
-  margin-top: 20px;
-  padding-top: 16px;
-  border-top: 1px solid #dbe3ee;
+.team-descendant-progress {
+  height: 9px;
+  margin-top: 22px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8f0;
 }
 
-.team-children summary {
-  width: fit-content;
-  color: #334155;
-  font-size: 15px;
-  font-weight: 800;
-  cursor: pointer;
-}
-
-.team-child-list {
-  display: grid;
-  gap: 10px;
-  margin: 14px 0 0;
-  padding: 0;
-  list-style: none;
-}
-
-.team-child-row {
-  display: grid;
-  grid-template-columns: max-content minmax(0, 1fr);
-  align-items: baseline;
-  gap: 12px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: #fff;
-  font-size: 15px;
-}
-
-.team-child-depth-1 {
-  margin-left: 12px;
-}
-
-.team-child-depth-2 {
-  margin-left: 24px;
-}
-
-.team-child-summary {
-  overflow-wrap: anywhere;
-  color: #334155;
-  font-weight: 600;
+.team-descendant-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: #7c3aed;
+  transition: width 250ms ease;
 }
 
 .team-no-work {
@@ -783,11 +743,6 @@ body.team-focus {
   font-size: clamp(22px, 2vw, 28px);
 }
 
-.team-overview-person .team-person-work-count {
-  margin-top: 4px;
-  font-size: 14px;
-}
-
 .team-overview-person .team-work-list {
   grid-template-columns: minmax(0, 1fr);
   gap: 12px;
@@ -809,9 +764,7 @@ body.team-focus {
   gap: 7px;
 }
 
-.team-overview-person .team-ticket-type,
-.team-overview-person .team-status-pill,
-.team-overview-person .team-context-pill {
+.team-overview-person .team-ticket-type {
   min-height: 24px;
   padding: 3px 8px;
   font-size: 11px;
@@ -826,27 +779,14 @@ body.team-focus {
   font-size: 19px;
 }
 
-.team-overview-person .team-context-pill {
-  margin-top: 8px;
+.team-overview-person .team-context-label {
+  margin-bottom: 8px;
+  font-size: 10px;
 }
 
-.team-overview-person .team-children {
-  margin-top: 12px;
-  padding-top: 12px;
-}
-
-.team-overview-person .team-children summary {
-  font-size: 13px;
-}
-
-.team-overview-person .team-child-row {
-  gap: 8px;
-  padding: 8px;
-  font-size: 13px;
-}
-
-.team-overview-person .team-child-row .team-ticket-key {
-  font-size: 12px;
+.team-overview-person .team-descendant-progress {
+  height: 7px;
+  margin-top: 14px;
 }
 
 .team-overview-person .team-no-work {
