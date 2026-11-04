@@ -41,17 +41,23 @@
     return `${location.pathname}?${parameters.toString()}${location.hash || ''}`;
   }
 
+  function formatUpdatedDateTime(date) {
+    const pad = value => String(value).padStart(2, '0');
+    const year = String(date.getFullYear()).padStart(4, '0');
+    return `${year}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
   function getIssueKey(issue) {
     return typeof issue.key === 'string' ? issue.key.trim() : '';
   }
 
-  function getParentIssue(issue, issuesByKey) {
+  function getParentIssue(issue, issuesByKey, parentContextsByKey) {
     const parentKey = typeof issue.parent_key === 'string' ? issue.parent_key.trim() : '';
     if (!parentKey) {
       return null;
     }
 
-    return issuesByKey.get(parentKey) || {
+    return issuesByKey.get(parentKey) || parentContextsByKey.get(parentKey) || {
       key: parentKey,
       summary: issue.parent_summary || parentKey,
       issue_type: issue.parent_issue_type || 'Issue',
@@ -62,26 +68,24 @@
     };
   }
 
-  function groupActiveIssues(activeIssues, issuesByKey, activeKeys) {
+  function groupActiveIssues(activeIssues, issuesByKey, parentContextsByKey, activeKeys) {
     const groups = new Map();
 
     for (const issue of activeIssues) {
       let rootIssue = issue;
       let currentIssue = issue;
-      let depth = 0;
       const visitedKeys = new Set([getIssueKey(issue)]);
 
       while (currentIssue.parent_key) {
-        const parentIssue = getParentIssue(currentIssue, issuesByKey);
+        const parentIssue = getParentIssue(currentIssue, issuesByKey, parentContextsByKey);
         const parentKey = parentIssue && getIssueKey(parentIssue);
-        if (!parentKey || parentIssue.status_category !== IN_PROGRESS || visitedKeys.has(parentKey)) {
+        if (!parentKey || visitedKeys.has(parentKey)) {
           break;
         }
 
         rootIssue = parentIssue;
         currentIssue = parentIssue;
         visitedKeys.add(parentKey);
-        depth++;
       }
 
       const rootKey = getIssueKey(rootIssue) || `issue-${groups.size}`;
@@ -89,15 +93,12 @@
       if (!group) {
         group = {
           ticket: rootIssue,
-          children: [],
+          activeIssueCount: 0,
           memberOwnsTicket: activeKeys.has(rootKey)
         };
         groups.set(rootKey, group);
       }
-
-      if (getIssueKey(issue) !== rootKey) {
-        group.children.push({ issue, depth });
-      }
+      group.activeIssueCount++;
     }
 
     return Array.from(groups.values());
@@ -111,6 +112,20 @@
       const key = getIssueKey(issue);
       if (key) {
         issuesByKey.set(key, issue);
+      }
+    }
+
+    const parentContextsByKey = new Map();
+    for (const issue of issueList) {
+      if (!Array.isArray(issue.parent_chain)) {
+        continue;
+      }
+
+      for (const parent of issue.parent_chain) {
+        const key = parent && typeof parent === 'object' ? getIssueKey(parent) : '';
+        if (key && !parentContextsByKey.has(key)) {
+          parentContextsByKey.set(key, parent);
+        }
       }
     }
 
@@ -141,7 +156,7 @@
         return {
           ...member,
           activeCount: member.activeIssues.length,
-          groups: groupActiveIssues(member.activeIssues, issuesByKey, activeKeys)
+          groups: groupActiveIssues(member.activeIssues, issuesByKey, parentContextsByKey, activeKeys)
         };
       })
       .sort((left, right) => left.name.localeCompare(right.name));
@@ -215,30 +230,66 @@
     return createElement(document, 'span', 'team-person-avatar team-person-initial', name.charAt(0).toUpperCase());
   }
 
-  function createChildRow(child, metadata, root, document) {
-    const depthClass = Math.min(Math.max(child.depth - 1, 0), 2);
-    const row = createElement(document, 'li', `team-child-row team-child-depth-${depthClass}`);
-    const key = createElement(document, 'span', 'team-child-key-wrap');
-    appendIssueKey(key, child.issue, metadata, root, document);
-    row.appendChild(key);
-    row.appendChild(createElement(document, 'span', 'team-child-summary', child.issue.summary || child.issue.key || 'No summary'));
-    return row;
+  function getDescendantProgress(issue) {
+    const progress = issue && issue.descendant_progress;
+    if (
+      !progress ||
+      !Number.isSafeInteger(progress.completed) ||
+      !Number.isSafeInteger(progress.total) ||
+      progress.completed < 0 ||
+      progress.total <= 0 ||
+      progress.completed > progress.total
+    ) {
+      return null;
+    }
+
+    return {
+      completed: progress.completed,
+      total: progress.total,
+      percent: (progress.completed / progress.total) * 100
+    };
   }
 
-  function createTicketCard(group, person, metadata, mode, root, document) {
-    const card = createElement(document, 'article', 'team-ticket-card');
+  function appendDescendantProgress(card, issue, document) {
+    const progress = getDescendantProgress(issue);
+    if (!progress) {
+      return;
+    }
+
+    const bar = createElement(document, 'div', 'team-descendant-progress');
+    const label = `${progress.completed} of ${progress.total} descendant tickets complete`;
+    bar.setAttribute('role', 'progressbar');
+    bar.setAttribute('aria-label', 'Completed descendant tickets');
+    bar.setAttribute('aria-valuemin', '0');
+    bar.setAttribute('aria-valuemax', String(progress.total));
+    bar.setAttribute('aria-valuenow', String(progress.completed));
+    bar.setAttribute('aria-valuetext', `${label} (${Math.round(progress.percent)}%)`);
+    bar.title = label;
+
+    const fill = createElement(document, 'span', 'team-descendant-progress-fill');
+    fill.setAttribute('aria-hidden', 'true');
+    fill.style.width = `${progress.percent}%`;
+    bar.appendChild(fill);
+    card.appendChild(bar);
+  }
+
+  function createTicketCard(group, metadata, root, document) {
+    const isParentContext = !group.memberOwnsTicket;
+    const cardClass = isParentContext
+      ? 'team-ticket-card team-parent-context-card'
+      : 'team-ticket-card';
+    const card = createElement(document, 'article', cardClass);
+    if (isParentContext) {
+      card.appendChild(createElement(document, 'p', 'team-context-label', 'Working toward'));
+    }
+
     const headingRow = createElement(document, 'div', 'team-ticket-heading');
     const identity = createElement(document, 'div', 'team-ticket-identity');
     const type = group.ticket.issue_type || 'Issue';
     identity.appendChild(createElement(document, 'span', 'team-ticket-type', type));
     appendIssueKey(identity, group.ticket, metadata, root, document);
     headingRow.appendChild(identity);
-    headingRow.appendChild(createElement(document, 'span', 'team-status-pill', 'In progress'));
     card.appendChild(headingRow);
-
-    if (!group.memberOwnsTicket) {
-      card.appendChild(createElement(document, 'span', 'team-context-pill', 'Parent context'));
-    }
 
     card.appendChild(createElement(
       document,
@@ -246,27 +297,8 @@
       'team-ticket-summary',
       group.ticket.summary || group.ticket.key || 'No summary'
     ));
-
-    if (group.children.length > 0) {
-      const details = createElement(document, 'details', 'team-children');
-      details.open = mode === 'carousel' && person.groups.length <= 2 && group.children.length <= 2;
-      const childCount = group.children.length;
-      const childLabel = group.memberOwnsTicket
-        ? `${childCount} in-progress child ${childCount === 1 ? 'ticket' : 'tickets'}`
-        : `${childCount} in-progress ${childCount === 1 ? 'ticket' : 'tickets'} under this parent`;
-      details.appendChild(createElement(
-        document,
-        'summary',
-        '',
-        childLabel
-      ));
-
-      const childList = createElement(document, 'ul', 'team-child-list');
-      for (const child of group.children) {
-        childList.appendChild(createChildRow(child, metadata, root, document));
-      }
-      details.appendChild(childList);
-      card.appendChild(details);
+    if (isParentContext) {
+      appendDescendantProgress(card, group.ticket, document);
     }
 
     return card;
@@ -282,8 +314,6 @@
 
     const details = createElement(document, 'div', 'team-person-details');
     details.appendChild(createElement(document, 'h3', 'team-person-name', person.name));
-    const activeLabel = `${person.activeCount} in-progress ${person.activeCount === 1 ? 'ticket' : 'tickets'}`;
-    details.appendChild(createElement(document, 'p', 'team-person-work-count', activeLabel));
     header.appendChild(details);
     panel.appendChild(header);
 
@@ -296,7 +326,7 @@
 
     const workList = createElement(document, 'div', getWorkListClass(mode, ticketLayout));
     for (const group of person.groups) {
-      workList.appendChild(createTicketCard(group, person, metadata, mode, root, document));
+      workList.appendChild(createTicketCard(group, metadata, root, document));
     }
     panel.appendChild(workList);
     return panel;
@@ -479,7 +509,7 @@
 
       const updatedAt = metadata.last_updated_utc ? new Date(metadata.last_updated_utc) : null;
       elements.lastUpdated.textContent = updatedAt && !Number.isNaN(updatedAt.getTime())
-        ? `Updated ${updatedAt.toLocaleString()}`
+        ? `Updated ${formatUpdatedDateTime(updatedAt)}`
         : 'Update time unavailable';
 
       elements.teamError.hidden = true;
@@ -540,5 +570,14 @@
     loadData();
   }
 
-  return { buildTeamMembers, buildViewSettingsUrl, getWorkListClass, initialize, parseViewSettings };
+  return {
+    buildTeamMembers,
+    buildViewSettingsUrl,
+    createTicketCard,
+    createPersonPanel,
+    formatUpdatedDateTime,
+    getWorkListClass,
+    initialize,
+    parseViewSettings
+  };
 });

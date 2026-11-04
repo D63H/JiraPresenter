@@ -9,7 +9,9 @@ import os
 import sys
 import json
 import argparse
+from collections import deque
 from datetime import datetime, timezone
+from urllib.parse import quote
 import requests
 from requests.auth import HTTPBasicAuth
 
@@ -301,6 +303,241 @@ def parse_issue(issue, base_url):
     }
 
 
+def sanitize_parent_context(issue, base_url):
+    """Returns the allowlisted fields needed to display one ancestor."""
+    parsed_issue = parse_issue(issue, base_url)
+    fields = issue.get("fields")
+    fields = fields if isinstance(fields, dict) else {}
+    status_obj = fields.get("status")
+    status_obj = status_obj if isinstance(status_obj, dict) else {}
+    status_category_obj = status_obj.get("statusCategory")
+    status_category_obj = status_category_obj if isinstance(status_category_obj, dict) else {}
+    issue_type_obj = fields.get("issuetype")
+    issue_type_obj = issue_type_obj if isinstance(issue_type_obj, dict) else {}
+    return {
+        "key": parsed_issue["key"],
+        "summary": fields.get("summary") or parsed_issue["key"] or "No summary",
+        "status": status_obj.get("name") or "",
+        "status_category": status_category_obj.get("key") or "",
+        "status_category_name": status_category_obj.get("name") or "",
+        "issue_type": issue_type_obj.get("name") or "Issue",
+        "jira_url": parsed_issue["jira_url"],
+        "parent_key": parsed_issue["parent_key"]
+    }
+
+
+def build_parent_chain(issue, base_url, issues_by_key, fetch_parent, parent_cache=None):
+    """Resolves parent context through the highest available Jira ancestor."""
+    cache = parent_cache if parent_cache is not None else {}
+    current_issue = issue
+    current_key = issue.get("key")
+    visited_keys = {current_key} if isinstance(current_key, str) and current_key else set()
+    parent_chain = []
+
+    while True:
+        fields = current_issue.get("fields")
+        if not isinstance(fields, dict):
+            break
+        parent = fields.get("parent")
+        if not isinstance(parent, dict):
+            break
+
+        parent_key = parent.get("key")
+        if not isinstance(parent_key, str) or not parent_key or parent_key in visited_keys:
+            break
+
+        parent_issue = issues_by_key.get(parent_key) or cache.get(parent_key)
+        if parent_issue is None:
+            parent_issue = fetch_parent(parent_key)
+            if parent_issue is None:
+                parent_fields = parent.get("fields")
+                parent_issue = {
+                    "key": parent_key,
+                    "fields": parent_fields if isinstance(parent_fields, dict) else {}
+                }
+            cache[parent_key] = parent_issue
+
+        if not isinstance(parent_issue, dict) or parent_issue.get("key") != parent_key:
+            raise RuntimeError(f"Jira returned mismatched issue data for ancestor {parent_key}")
+
+        parent_chain.append(sanitize_parent_context(parent_issue, base_url))
+        current_issue = parent_issue
+        visited_keys.add(parent_key)
+
+    return parent_chain
+
+
+def fetch_parent_issue(base_url, issue_key, auth, headers):
+    """Fetches one missing parent with only the fields needed for hierarchy."""
+    encoded_key = quote(issue_key, safe="")
+    params = {"fields": "summary,status,issuetype,parent"}
+    endpoint = f"{base_url}/rest/api/3/issue/{encoded_key}"
+    response = requests.get(endpoint, auth=auth, headers=headers, params=params, timeout=20)
+
+    if response.status_code in (404, 405):
+        endpoint = f"{base_url}/rest/api/2/issue/{encoded_key}"
+        response = requests.get(endpoint, auth=auth, headers=headers, params=params, timeout=20)
+
+    if response.status_code in (403, 404):
+        print(
+            f"Warning: Jira returned HTTP {response.status_code} for ancestor {issue_key}; "
+            "using parent details available from the linked issue.",
+            file=sys.stderr
+        )
+        return None
+    if response.status_code != 200:
+        raise RuntimeError(f"HTTP {response.status_code} fetching Jira ancestor {issue_key}")
+
+    issue = response.json()
+    if not isinstance(issue, dict) or issue.get("key") != issue_key:
+        raise RuntimeError(f"Unexpected Jira response when fetching ancestor {issue_key}")
+    return issue
+
+
+class DescendantProgressError(RuntimeError):
+    """Raised when Jira cannot provide a reliable descendant progress result."""
+
+
+def fetch_direct_children(base_url, parent_keys, auth, headers):
+    """Fetches status-only data for a batch of parents' direct children."""
+    if not parent_keys:
+        return []
+
+    parent_label = ", ".join(parent_keys)
+    escaped_keys = []
+    for parent_key in parent_keys:
+        escaped_key = parent_key.replace("\\", "\\\\").replace('"', '\\"')
+        escaped_keys.append(f'"{escaped_key}"')
+    if len(escaped_keys) == 1:
+        jql_query = f"parent = {escaped_keys[0]}"
+    else:
+        jql_query = f"parent in ({', '.join(escaped_keys)})"
+    endpoint = f"{base_url}/rest/api/3/search/jql"
+    legacy_endpoint = False
+    max_results = 50
+    start_at = 0
+    next_page_token = None
+    children = []
+
+    while True:
+        params = {
+            "jql": jql_query,
+            "maxResults": max_results,
+            "fields": "status"
+        }
+        if legacy_endpoint:
+            params["startAt"] = start_at
+        elif next_page_token:
+            params["nextPageToken"] = next_page_token
+
+        response = requests.get(endpoint, auth=auth, headers=headers, params=params, timeout=20)
+        if response.status_code in (404, 405) and not legacy_endpoint:
+            endpoint = f"{base_url}/rest/api/2/search"
+            legacy_endpoint = True
+            continue
+        if response.status_code == 400 and len(parent_keys) > 1:
+            print(
+                "Warning: Jira rejected a batched descendant query; retrying parents individually.",
+                file=sys.stderr
+            )
+            children = []
+            for parent_key in parent_keys:
+                parent_children = fetch_direct_children(base_url, [parent_key], auth, headers)
+                if parent_children is None:
+                    return None
+                children.extend(parent_children)
+            return children
+        if response.status_code in (403, 404):
+            print(
+                f"Warning: Jira returned HTTP {response.status_code} while loading descendants "
+                f"of {parent_label}; omitting its progress bar.",
+                file=sys.stderr
+            )
+            return None
+        if response.status_code != 200:
+            raise DescendantProgressError(
+                f"HTTP {response.status_code} querying Jira descendants of {parent_label}"
+            )
+
+        data = response.json()
+        if not isinstance(data, dict) or not isinstance(data.get("issues"), list):
+            raise DescendantProgressError(
+                f"Unexpected Jira search response for descendants of {parent_label}"
+            )
+        issues_batch = data["issues"]
+        children.extend(issues_batch)
+
+        if legacy_endpoint:
+            if not issues_batch:
+                break
+            start_at += len(issues_batch)
+            total = data.get("total")
+            if isinstance(total, int) and start_at >= total:
+                break
+            if not isinstance(total, int) and len(issues_batch) < max_results:
+                break
+        else:
+            next_page_token = data.get("nextPageToken")
+            if data.get("isLast") or not next_page_token or not issues_batch:
+                break
+
+    return children
+
+
+def fetch_descendant_progress(base_url, root_key, auth, headers):
+    """Counts completed and total descendants without exporting their details."""
+    pending_keys = deque([root_key])
+    visited_keys = {root_key}
+    total = 0
+    completed = 0
+
+    try:
+        while pending_keys:
+            parent_keys = []
+            while pending_keys and len(parent_keys) < 50:
+                parent_keys.append(pending_keys.popleft())
+            parent_label = ", ".join(parent_keys)
+
+            children = fetch_direct_children(base_url, parent_keys, auth, headers)
+            if children is None:
+                return None
+
+            for child in children:
+                if not isinstance(child, dict):
+                    raise DescendantProgressError(
+                        f"Unexpected Jira descendant data under {parent_label}"
+                    )
+                child_key = child.get("key")
+                if not isinstance(child_key, str) or not child_key:
+                    raise DescendantProgressError(
+                        f"Jira descendant under {parent_label} is missing its issue key"
+                    )
+                if child_key in visited_keys:
+                    continue
+
+                visited_keys.add(child_key)
+                total += 1
+                pending_keys.append(child_key)
+
+                fields = child.get("fields")
+                fields = fields if isinstance(fields, dict) else {}
+                status = fields.get("status")
+                status = status if isinstance(status, dict) else {}
+                category = status.get("statusCategory")
+                category = category if isinstance(category, dict) else {}
+                if category.get("key") == "done":
+                    completed += 1
+    except (DescendantProgressError, requests.RequestException, ValueError) as error:
+        print(
+            f"Warning: Could not calculate descendant progress for {root_key}: {error}. "
+            "The parent context will still be exported.",
+            file=sys.stderr
+        )
+        return None
+
+    return {"completed": completed, "total": total} if total else None
+
+
 def fetch_from_jira(base_url, email, token, board_id=None, project_key=None, custom_jql=None, site_title=None):
     """Pulls issues from Jira Cloud REST API using Agile Board or JQL."""
     base_url = base_url.rstrip("/")
@@ -440,7 +677,48 @@ def fetch_from_jira(base_url, email, token, board_id=None, project_key=None, cus
     print(f"Successfully retrieved {len(raw_issues)} issues.")
 
     # 3. Sanitize and structure data
-    parsed_issues = [parse_issue(issue, base_url) for issue in raw_issues]
+    raw_issues_by_key = {
+        issue["key"]: issue
+        for issue in raw_issues
+        if isinstance(issue, dict) and isinstance(issue.get("key"), str) and issue["key"]
+    }
+    parent_cache = {}
+    parsed_issues = []
+    for issue in raw_issues:
+        parsed_issue = parse_issue(issue, base_url)
+        if parsed_issue["status_category"] == "indeterminate":
+            parsed_issue["parent_chain"] = build_parent_chain(
+                issue,
+                base_url,
+                raw_issues_by_key,
+                lambda key: fetch_parent_issue(base_url, key, auth, headers),
+                parent_cache
+            )
+        parsed_issues.append(parsed_issue)
+
+    top_level_parents = {}
+    for issue in parsed_issues:
+        parent_chain = issue.get("parent_chain")
+        if parent_chain:
+            top_parent = parent_chain[-1]
+            top_parent_key = top_parent.get("key")
+            if isinstance(top_parent_key, str) and top_parent_key:
+                top_level_parents.setdefault(top_parent_key, top_parent)
+
+    descendant_progress_by_key = {}
+    for parent_key in top_level_parents:
+        progress = fetch_descendant_progress(base_url, parent_key, auth, headers)
+        if progress is not None:
+            descendant_progress_by_key[parent_key] = progress
+
+    for issue in parsed_issues:
+        issue_key = issue.get("key")
+        if issue_key in descendant_progress_by_key:
+            issue["descendant_progress"] = descendant_progress_by_key[issue_key]
+        for parent in issue.get("parent_chain", []):
+            parent_key = parent.get("key")
+            if parent_key in descendant_progress_by_key:
+                parent["descendant_progress"] = descendant_progress_by_key[parent_key]
 
     # Calculate statistics
     todo_count = sum(1 for i in parsed_issues if i["status_category"] == "new")
@@ -506,11 +784,12 @@ def main():
             )
         except Exception as e:
             print(f"Error fetching live data from Jira: {e}", file=sys.stderr)
-            print("Falling back to existing or mock data so deployment does not fail...")
             if os.path.exists(args.output):
-                print(f"Preserving existing {args.output}")
-                return
-            data = get_mock_data(site_title=site_title or "Project Roadmap", base_url=base_url, project_key=project_key or "DEMO", board_id=board_id or "1")
+                print(
+                    f"Preserving existing {args.output}, but failing this run to avoid publishing stale data.",
+                    file=sys.stderr
+                )
+            raise
 
     with open(args.output, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
