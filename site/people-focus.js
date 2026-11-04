@@ -41,6 +41,12 @@
     return `${location.pathname}?${parameters.toString()}${location.hash || ''}`;
   }
 
+  function formatUpdatedDateTime(date) {
+    const pad = value => String(value).padStart(2, '0');
+    const year = String(date.getFullYear()).padStart(4, '0');
+    return `${year}-${pad(date.getMonth() + 1)}-${pad(date.getDate())} ${pad(date.getHours())}:${pad(date.getMinutes())}`;
+  }
+
   function getIssueKey(issue) {
     return typeof issue.key === 'string' ? issue.key.trim() : '';
   }
@@ -503,7 +509,7 @@
 
       const updatedAt = metadata.last_updated_utc ? new Date(metadata.last_updated_utc) : null;
       elements.lastUpdated.textContent = updatedAt && !Number.isNaN(updatedAt.getTime())
-        ? `Updated ${updatedAt.toLocaleString()}`
+        ? `Updated ${formatUpdatedDateTime(updatedAt)}`
         : 'Update time unavailable';
 
       elements.teamError.hidden = true;
@@ -569,6 +575,7 @@
     buildViewSettingsUrl,
     createTicketCard,
     createPersonPanel,
+    formatUpdatedDateTime,
     getWorkListClass,
     initialize,
     parseViewSettings

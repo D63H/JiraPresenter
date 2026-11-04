@@ -1,5 +1,6 @@
 from contextlib import redirect_stderr
 from io import StringIO
+import os
 import unittest
 from unittest.mock import Mock, patch
 
@@ -39,6 +40,53 @@ class DescendantProgressTests(unittest.TestCase):
     @patch("fetch_jira.requests.get")
     def test_omits_progress_when_descendants_cannot_be_loaded(self, get):
         get.return_value = Mock(status_code=403)
+
+        with redirect_stderr(StringIO()):
+            progress = fetch_jira.fetch_descendant_progress(
+                "https://jira.example",
+                "APP-1",
+                auth=None,
+                headers={"Accept": "application/json"}
+            )
+
+        self.assertIsNone(progress)
+
+    @patch("fetch_jira.requests.get")
+    def test_jira_rejected_parent_batch_retries_with_single_parent_queries(self, get):
+        first_response = Mock(status_code=400)
+        first_parent_response = Mock(status_code=200)
+        first_parent_response.json.return_value = {
+            "issues": [raw_issue("APP-3", "Completed task", "done", "Task")],
+            "isLast": True
+        }
+        second_parent_response = Mock(status_code=200)
+        second_parent_response.json.return_value = {
+            "issues": [raw_issue("APP-4", "Active task", "indeterminate", "Task")],
+            "isLast": True
+        }
+        get.side_effect = [first_response, first_parent_response, second_parent_response]
+
+        with redirect_stderr(StringIO()):
+            children = fetch_jira.fetch_direct_children(
+                "https://jira.example",
+                ["APP-1", "APP-2"],
+                auth=None,
+                headers={"Accept": "application/json"}
+            )
+
+        self.assertEqual([child["key"] for child in children], ["APP-3", "APP-4"])
+        self.assertEqual(
+            [call.kwargs["params"]["jql"] for call in get.call_args_list],
+            [
+                'parent in ("APP-1", "APP-2")',
+                'parent = "APP-1"',
+                'parent = "APP-2"'
+            ]
+        )
+
+    @patch("fetch_jira.requests.get")
+    def test_query_errors_omit_progress_without_raising(self, get):
+        get.return_value = Mock(status_code=400)
 
         with redirect_stderr(StringIO()):
             progress = fetch_jira.fetch_descendant_progress(
@@ -136,6 +184,29 @@ class DescendantProgressTests(unittest.TestCase):
         ]
         self.assertEqual(len(root_query_calls), 2)
         self.assertEqual(root_query_calls[1].kwargs["params"]["nextPageToken"], "next-page")
+
+
+class MainFetchFailureTests(unittest.TestCase):
+    def test_live_fetch_failure_preserves_output_but_fails_the_run(self):
+        with (
+            patch.dict(os.environ, {
+                "JIRA_BASE_URL": "https://jira.example",
+                "JIRA_USER_EMAIL": "user@example.com",
+                "JIRA_API_TOKEN": "synthetic-token"
+            }, clear=True),
+            patch("sys.argv", ["fetch_jira.py", "--output", "synthetic/data.json"]),
+            patch("fetch_jira.os.makedirs"),
+            patch("fetch_jira.os.path.exists", return_value=True),
+            patch(
+                "fetch_jira.fetch_from_jira",
+                side_effect=RuntimeError("synthetic request failure")
+            ) as fetch,
+            redirect_stderr(StringIO())
+        ):
+            with self.assertRaisesRegex(RuntimeError, "synthetic request failure"):
+                fetch_jira.main()
+
+        fetch.assert_called_once()
 
 
 class ParentChainTests(unittest.TestCase):
@@ -261,6 +332,48 @@ class ParentChainTests(unittest.TestCase):
             data["issues"][0]["parent_chain"][-1]["descendant_progress"],
             {"completed": 0, "total": 2}
         )
+
+    @patch("fetch_jira.requests.get")
+    def test_descendant_progress_failure_does_not_drop_parent_chain(self, get):
+        feature_set = raw_issue("APP-1", "Feature Set", "new", "Feature Set")
+        epic = raw_issue(
+            "APP-2",
+            "Epic",
+            "new",
+            "Epic",
+            parent=parent_reference("APP-1", "Feature Set", "new", "Feature Set")
+        )
+        task = raw_issue(
+            "APP-3",
+            "Task",
+            "indeterminate",
+            "Task",
+            parent=parent_reference("APP-2", "Epic", "new", "Epic"),
+            assignee="Alex"
+        )
+
+        search_response = Mock(status_code=200)
+        search_response.json.return_value = {"issues": [task], "isLast": True}
+        epic_response = Mock(status_code=200)
+        epic_response.json.return_value = epic
+        feature_response = Mock(status_code=200)
+        feature_response.json.return_value = feature_set
+        progress_response = Mock(status_code=400)
+        get.side_effect = [search_response, epic_response, feature_response, progress_response]
+
+        with redirect_stderr(StringIO()):
+            data = fetch_jira.fetch_from_jira(
+                "https://jira.example",
+                email="user@example.com",
+                token="synthetic-token",
+                custom_jql='project = "APP"'
+            )
+
+        self.assertEqual(
+            [parent["key"] for parent in data["issues"][0]["parent_chain"]],
+            ["APP-2", "APP-1"]
+        )
+        self.assertNotIn("descendant_progress", data["issues"][0]["parent_chain"][-1])
 
     @patch("fetch_jira.requests.get")
     def test_fetches_only_allowlisted_ancestor_fields(self, get):

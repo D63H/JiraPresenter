@@ -7,6 +7,7 @@ const {
   buildViewSettingsUrl,
   createPersonPanel,
   createTicketCard,
+  formatUpdatedDateTime,
   getWorkListClass,
   parseViewSettings
 } = require('./people-focus.js');
@@ -107,6 +108,13 @@ test('updates view query parameters while preserving unrelated settings and hash
   assert.equal(parsedUrl.searchParams.get('view'), 'overview');
   assert.equal(parsedUrl.searchParams.get('layout'), 'stacked');
   assert.equal(parsedUrl.hash, '#team');
+});
+
+test('formats the update time as a local 24-hour timestamp', () => {
+  assert.equal(
+    formatUpdatedDateTime(new Date(2026, 10, 4, 16, 5)),
+    '2026-11-04 16:05'
+  );
 });
 
 test('groups in-progress work under the highest ancestor', () => {

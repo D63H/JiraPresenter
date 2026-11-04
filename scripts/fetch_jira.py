@@ -394,6 +394,10 @@ def fetch_parent_issue(base_url, issue_key, auth, headers):
     return issue
 
 
+class DescendantProgressError(RuntimeError):
+    """Raised when Jira cannot provide a reliable descendant progress result."""
+
+
 def fetch_direct_children(base_url, parent_keys, auth, headers):
     """Fetches status-only data for a batch of parents' direct children."""
     if not parent_keys:
@@ -431,6 +435,18 @@ def fetch_direct_children(base_url, parent_keys, auth, headers):
             endpoint = f"{base_url}/rest/api/2/search"
             legacy_endpoint = True
             continue
+        if response.status_code == 400 and len(parent_keys) > 1:
+            print(
+                "Warning: Jira rejected a batched descendant query; retrying parents individually.",
+                file=sys.stderr
+            )
+            children = []
+            for parent_key in parent_keys:
+                parent_children = fetch_direct_children(base_url, [parent_key], auth, headers)
+                if parent_children is None:
+                    return None
+                children.extend(parent_children)
+            return children
         if response.status_code in (403, 404):
             print(
                 f"Warning: Jira returned HTTP {response.status_code} while loading descendants "
@@ -439,13 +455,15 @@ def fetch_direct_children(base_url, parent_keys, auth, headers):
             )
             return None
         if response.status_code != 200:
-            raise RuntimeError(
+            raise DescendantProgressError(
                 f"HTTP {response.status_code} querying Jira descendants of {parent_label}"
             )
 
         data = response.json()
         if not isinstance(data, dict) or not isinstance(data.get("issues"), list):
-            raise RuntimeError(f"Unexpected Jira search response for descendants of {parent_label}")
+            raise DescendantProgressError(
+                f"Unexpected Jira search response for descendants of {parent_label}"
+            )
         issues_batch = data["issues"]
         children.extend(issues_batch)
 
@@ -473,37 +491,49 @@ def fetch_descendant_progress(base_url, root_key, auth, headers):
     total = 0
     completed = 0
 
-    while pending_keys:
-        parent_keys = []
-        while pending_keys and len(parent_keys) < 50:
-            parent_keys.append(pending_keys.popleft())
-        parent_label = ", ".join(parent_keys)
+    try:
+        while pending_keys:
+            parent_keys = []
+            while pending_keys and len(parent_keys) < 50:
+                parent_keys.append(pending_keys.popleft())
+            parent_label = ", ".join(parent_keys)
 
-        children = fetch_direct_children(base_url, parent_keys, auth, headers)
-        if children is None:
-            return None
+            children = fetch_direct_children(base_url, parent_keys, auth, headers)
+            if children is None:
+                return None
 
-        for child in children:
-            if not isinstance(child, dict):
-                raise RuntimeError(f"Unexpected Jira descendant data under {parent_label}")
-            child_key = child.get("key")
-            if not isinstance(child_key, str) or not child_key:
-                raise RuntimeError(f"Jira descendant under {parent_label} is missing its issue key")
-            if child_key in visited_keys:
-                continue
+            for child in children:
+                if not isinstance(child, dict):
+                    raise DescendantProgressError(
+                        f"Unexpected Jira descendant data under {parent_label}"
+                    )
+                child_key = child.get("key")
+                if not isinstance(child_key, str) or not child_key:
+                    raise DescendantProgressError(
+                        f"Jira descendant under {parent_label} is missing its issue key"
+                    )
+                if child_key in visited_keys:
+                    continue
 
-            visited_keys.add(child_key)
-            total += 1
-            pending_keys.append(child_key)
+                visited_keys.add(child_key)
+                total += 1
+                pending_keys.append(child_key)
 
-            fields = child.get("fields")
-            fields = fields if isinstance(fields, dict) else {}
-            status = fields.get("status")
-            status = status if isinstance(status, dict) else {}
-            category = status.get("statusCategory")
-            category = category if isinstance(category, dict) else {}
-            if category.get("key") == "done":
-                completed += 1
+                fields = child.get("fields")
+                fields = fields if isinstance(fields, dict) else {}
+                status = fields.get("status")
+                status = status if isinstance(status, dict) else {}
+                category = status.get("statusCategory")
+                category = category if isinstance(category, dict) else {}
+                if category.get("key") == "done":
+                    completed += 1
+    except (DescendantProgressError, requests.RequestException, ValueError) as error:
+        print(
+            f"Warning: Could not calculate descendant progress for {root_key}: {error}. "
+            "The parent context will still be exported.",
+            file=sys.stderr
+        )
+        return None
 
     return {"completed": completed, "total": total} if total else None
 
@@ -754,11 +784,12 @@ def main():
             )
         except Exception as e:
             print(f"Error fetching live data from Jira: {e}", file=sys.stderr)
-            print("Falling back to existing or mock data so deployment does not fail...")
             if os.path.exists(args.output):
-                print(f"Preserving existing {args.output}")
-                return
-            data = get_mock_data(site_title=site_title or "Project Roadmap", base_url=base_url, project_key=project_key or "DEMO", board_id=board_id or "1")
+                print(
+                    f"Preserving existing {args.output}, but failing this run to avoid publishing stale data.",
+                    file=sys.stderr
+                )
+            raise
 
     with open(args.output, "w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, ensure_ascii=False)
